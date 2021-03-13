@@ -1,0 +1,79 @@
+#include "udf.h"
+#include "stdio.h"
+#include<math.h>
+DEFINE_CG_MOTION(ROtor_Motion,dt,vel,omega,time,dtime)
+{
+	Thread *tf = DT_THREAD (dt);
+	face_t f;
+	Node *v;
+	real NV_VEC (axis), NV_VEC (dx);
+	real NV_VEC (origin), NV_VEC (rvec), NV_VEC (center), NV_VEC (trans);
+	real rotation_radii, RPM;
+	real x1,x2,y1,y2;
+	real time1, time2, theta1, theta2;
+	int n;
+	real CGravity[ND_ND];
+	real xnew[ND_ND];
+	real count;
+	SET_DEFORMING_THREAD_FLAG (THREAD_T0 (tf));
+	x1 = 0.000635;
+	x2 = 0.000635;
+	y1 = 0;
+	y2 = 0;
+	RPM = 150.796416;
+	NV_D (axis, =, 0.0, 0.0, 1.0);
+	NV_D (origin, =, 0.0, 0.0, 0.0);
+	NV_D (center, =, x1, 0.0, 0.0);
+	NV_D (trans, =, 0.0, 0.0, 0.0);
+	time1 = time;
+	time2 = time+dtime;
+	theta1= time1 * RPM;
+	theta2= time2 * RPM;
+	Message ("\n whirl angle=%f time=%f\n",theta1*180/3.141592,time);
+	if (fabs(theta1) > 6.28318531 && fabs(theta1) < 12.56637062)
+		theta1 -= 6.28318531;
+	if (fabs(theta2) > 6.28318531 && fabs(theta2) < 12.56637062)
+		theta2 -= 6.28318531;
+	if (fabs(theta1) > 12.56637062 && fabs(theta1) < 18.84955593)
+		theta1 -= 12.56637062;
+	if (fabs(theta2) > 12.56637062 && fabs(theta2) < 18.84955593)
+		theta2 -= 12.56637062;
+	x1 =(25.197841-30.409216*pow(theta1,1)+12.382895*pow(theta1,2)-2.1840395*pow(theta1,3)+0.146419016*pow(theta1,4))/(1-0.98597326*pow(theta1,1)+0.42802009*pow(theta1,2)-0.083464959*pow(theta1,3)+0.0060158968*pow(theta1,4));
+	x2 =(25.197841-30.409216*pow(theta2,1)+12.382895*pow(theta2,2)-2.1840395*pow(theta2,3)+0.146419016*pow(theta2,4))/(1-0.98597326*pow(theta2,1)+0.42802009*pow(theta2,2)-0.083464959*pow(theta2,3)+0.0060158968*pow(theta2,4));
+	y1= 0.16948823+20.626258*pow(theta1,1)+65.459141*pow(theta1,2)-165.9372*pow(theta1,3)+187.78591*pow(theta1,4)-116.481*pow(theta1,5)+42.194318*pow(theta1,6)-9.207848*pow(theta1,7)+1.1960505*pow(theta1,8)-0.085357117*pow(theta1,9)+0.0025804057*pow(theta1,10);
+	y2= 0.16948823+20.626258*pow(theta2,1)+65.459141*pow(theta2,2)-1659372*pow(theta2,3)+187.78591*pow(theta2,4)-116.481*pow(theta2,5)+42.194318*pow(theta2,6)-9.207848*pow(theta2,7)+1.1960505*pow(theta2,8)-0.085357117*pow(theta2,9)+0.0025804057*pow(theta2,10);
+	x1= x1*0.001*0.0254;
+	x2=x2*0.001*0.0254;
+	y1= y1*0.001*0.0254;
+	y2= y2*0.001*0.0254;
+	Message("\n x1%f\n",x1);
+	Message("\n y1%f\n",y1);
+	Message("\n x2%f\n",x2);
+	Message("\n y2%f\n",y2);
+	trans[0] = x2 - x1;
+	trans[1] = y2 - y1;
+	Message ("%f %f %f \n", theta1*180/3.141592, trans[0], trans[1]);
+	CGravity[0] =0;
+	CGravity[1] =0;
+	count =0;
+	begin_f_loop (f, tf)
+  {
+	F_CENTROID(xnew,f,tf);
+	CGravity[0] = CGravity[0]+xnew[0];
+	CGravity[1] = CGravity[1]+xnew[1];
+	count = count + 1;
+	f_node_loop (f, tf, n)
+    {
+	v = F_NODE (f, tf, n);
+	if (NODE_POS_NEED_UPDATE (v))
+      {
+	NODE_POS_UPDATED(v);
+	NV_V (NODE_COORD (v), +=, trans);
+      }
+    }
+  }
+    end_f_loop (f, tf);
+	CGravity[0] = CGravity[0]/count;
+	CGravity[1] = CGravity[1]/count;
+	Message ("%f %f \n", CGravity[0], CGravity[1]);
+}
